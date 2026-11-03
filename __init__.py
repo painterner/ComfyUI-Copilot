@@ -47,6 +47,7 @@ import folder_paths
 from .backend.controller.conversation_api import *
 from .backend.controller.llm_api import *
 from .backend.controller.expert_api import *
+from .backend.controller.mcp_api import *
 
 WEB_DIRECTORY = "entry"
 NODE_CLASS_MAPPINGS = {}

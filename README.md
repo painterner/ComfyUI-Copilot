@@ -40,6 +40,15 @@ https://github.com/user-attachments/assets/4b5806b8-dd34-4219-ac9f-6896115c5600
 
 
 
+## This fork
+
+`maintained` branch of [painterner/ComfyUI-Copilot](https://github.com/painterner/ComfyUI-Copilot), based on upstream
+`a5aa6ac`:
+
+- Configurable MCP servers, automatic use of other custom nodes' MCP endpoints, and chats that keep working
+  when a server is down — see [MCP_SERVERS.md](MCP_SERVERS.md).
+- Works with SQLAlchemy 2 (current ComfyUI requires it; upstream pinned `<2.0`).
+
 ## ⚠️ Service Update & Adjustment Notice
 
 > **Kindly be informed:** Due to an internal service review and update, the following features will **no longer be available** soon:

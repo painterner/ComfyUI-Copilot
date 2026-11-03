@@ -36,6 +36,14 @@ https://github.com/user-attachments/assets/17f8e822-e852-47fc-8dcb-0471526b099e
 
 
 
+## 本 fork
+
+[painterner/ComfyUI-Copilot](https://github.com/painterner/ComfyUI-Copilot) 的 `maintained` 分支，基于上游 `a5aa6ac`：
+
+- MCP 服务器可配置，自动接入其他自定义节点提供的 MCP（如 civitai-comfyui 的 `/civitai-fill/mcp`），
+  某个服务器连不上时跳过、聊天照常进行，见 [MCP_SERVERS.md](MCP_SERVERS.md)。
+- 支持 SQLAlchemy 2（当前 ComfyUI 需要；上游限制 `<2.0`）。
+
 ## ⚠️ 服务更新与调整公告
 
 > **温馨提示：** 由于内部服务审查与升级，以下功能即将**停止提供**：

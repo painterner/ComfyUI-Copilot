@@ -7,18 +7,19 @@ FilePath: /comfyui_copilot/backend/service/mcp-client.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
 from ..service.workflow_rewrite_tools import get_current_workflow
-from ..utils.globals import BACKEND_BASE_URL, get_comfyui_copilot_api_key, DISABLE_WORKFLOW_GEN
+from ..utils.globals import get_comfyui_copilot_api_key, DISABLE_WORKFLOW_GEN
+from .mcp_servers import comfy_local_endpoints, connect_servers, load_config, server_specs
 from .. import core
 import asyncio
 import os
 import traceback
+from contextlib import AsyncExitStack
 from typing import List, Dict, Any, Optional
 
 try:
     from agents._config import set_default_openai_api
     from agents.agent import Agent
     from agents.items import ItemHelpers
-    from agents.mcp import MCPServerSse
     from agents.run import Runner
     from agents.tracing import set_tracing_disabled
     from agents import handoff, RunContextWrapper, HandoffInputData
@@ -38,6 +39,10 @@ from ..service.workflow_rewrite_agent import create_workflow_rewrite_agent
 from ..service.message_memory import message_memory_optimize
 from ..utils.request_context import get_rewrite_context, get_session_id, get_config
 from ..utils.logger import log
+
+# Only when the Bing MCP server is connected.
+BING_CONSTRAINT = """- If you cannot find the information needed to answer a query, consider using bing_search to obtain relevant information. For example, if search_node tool cannot find the node, you can use bing_search to obtain relevant information about those nodes or components.
+- If search_node tool cannot find the node, you MUST use bing_search to obtain relevant information about those nodes or components."""
 from openai.types.responses import ResponseTextDeltaEvent
 from openai import APIError, RateLimitError
 from pydantic import BaseModel
@@ -117,30 +122,14 @@ async def comfyui_agent_invoke(messages: List[Dict[str, Any]], images: List[Imag
         messages = message_memory_optimize(session_id, messages)
         log.info(f"[MCP] Optimized messages count: {len(messages)}, messages: {messages}")
         
-        # Create MCP server instances
-        mcp_server = MCPServerSse(
-            params= {
-                "url": BACKEND_BASE_URL + "/mcp-server/mcp",
-                "timeout": 300.0,
-                "headers": {"X-Session-Id": session_id, "Authorization": f"Bearer {get_comfyui_copilot_api_key()}"}
-            },
-            cache_tools_list=True,
-            client_session_timeout_seconds=300.0
-        )
-        
-        bing_server = MCPServerSse(
-            params= {
-                "url": "https://mcp.api-inference.modelscope.net/8c9fe550938e4f/sse",
-                "timeout": 300.0,
-                "headers": {"X-Session-Id": session_id, "Authorization": f"Bearer {get_comfyui_copilot_api_key()}"}
-            },
-            cache_tools_list=True,
-            client_session_timeout_seconds=300.0
-        )
-        
-        server_list = [mcp_server, bing_server]
-        
-        async with mcp_server, bing_server:
+        # MCP servers: upstream's hosted ones, MCP endpoints of other custom nodes, and configured ones.
+        specs = server_specs(load_config(), session_id, get_comfyui_copilot_api_key(), comfy_local_endpoints())
+
+        async with AsyncExitStack() as mcp_stack:
+            connected = await connect_servers(mcp_stack, specs, reserved={"get_current_workflow"})
+            server_list = [server for _, server in connected]
+            connected_names = {name for name, _ in connected}
+            log.info(f"[MCP] Connected servers: {sorted(connected_names)}")
             
             # 创建workflow_rewrite_agent实例 (session_id通过context获取)
             workflow_rewrite_agent_instance = create_workflow_rewrite_agent()
@@ -222,6 +211,12 @@ IF the user wants to find or generate a NEW workflow from scratch.
 - [Critical!] When the user's intent is to get workflows or generate images with specific requirements, you MUST ALWAYS call BOTH recall_workflow tool AND gen_workflow tool to provide comprehensive workflow options. Never call just one of these tools - both are required for complete workflow assistance. First call recall_workflow to find existing similar workflows, then call gen_workflow to generate new workflow options.
 """
 
+            search_constraint = BING_CONSTRAINT if "bing" in connected_names else ""
+            extra_servers = sorted(connected_names - {"copilot", "bing"})
+            if extra_servers:
+                search_constraint += f"""
+- Tools from these MCP servers are also available: {', '.join(extra_servers)} (from other ComfyUI plugins or the user's settings). When the user's request matches a tool's description, use that tool, even if no CASE above covers it."""
+
             agent = create_agent(
                 name="ComfyUI-Copilot",
                 instructions=f"""You are a powerful AI assistant for designing image processing workflows, capable of automating problem-solving using tools and commands.
@@ -281,8 +276,7 @@ You must adhere to the following constraints to complete the task:
 {workflow_constraint}
 - When the user's intent is to query, return the query result directly without attempting to assist the user in performing operations.
 - When the user's intent is to get prompts for image generation (like Stable Diffusion). Use specific descriptive language with proper weight modifiers (e.g., (word:1.2)), prefer English terms, and separate elements with commas. Include quality terms (high quality, detailed), style specifications (realistic, anime), lighting (cinematic, golden hour), and composition (wide shot, close up) as needed. When appropriate, include negative prompts to exclude unwanted elements. Return words divided by commas directly without any additional text.
-- If you cannot find the information needed to answer a query, consider using bing_search to obtain relevant information. For example, if search_node tool cannot find the node, you can use bing_search to obtain relevant information about those nodes or components.
-- If search_node tool cannot find the node, you MUST use bing_search to obtain relevant information about those nodes or components.
+{search_constraint}
 
 - **ERROR MESSAGE ANALYSIS** - When a user pastes specific error text/logs (containing terms like "Failed", "Error", "Traceback", or stack traces), prioritize providing troubleshooting help rather than invoking search tools. Follow these steps:
   1. Analyze the error to identify the root cause (error type, affected component, missing dependencies, etc.)
