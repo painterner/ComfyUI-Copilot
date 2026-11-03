@@ -6,7 +6,7 @@ ModelScope Bing search, and a single unreachable server failed every chat.
 | Source | Default | What |
 |---|---|---|
 | `builtin` | on | Upstream's hosted Copilot MCP server and Bing search |
-| `local` | on | MCP endpoints other custom nodes serve on this ComfyUI: any `POST /<prefix>/mcp` route (Streamable HTTP). For example, [civitai-comfyui](https://github.com/painterner/ai-lib/tree/main/comfyui/civitai-comfyui) serves `/civitai-fill/mcp`, so its `civitai_*` tools are available in the chat with no setup |
+| `local` | on | MCP endpoints other custom nodes serve on this ComfyUI: any `POST /<prefix>/mcp` route (Streamable HTTP). For example, [civitai-comfyui](https://github.com/painterner/civitai-comfyui) serves `/civitai-fill/mcp`, so its `civitai_*` tools are available in the chat with no setup |
 | `servers` | none | Any other MCP server, Streamable HTTP or SSE |
 
 The servers connect in parallel when a chat starts. One that fails or does not answer within 30 seconds is
