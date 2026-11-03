@@ -2,7 +2,7 @@ import os
 import json
 from typing import Dict, Any, Optional, List
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, text
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
